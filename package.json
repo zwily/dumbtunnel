@@ -1,0 +1,17 @@
+{
+  "name": "dumbtunnel",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.13.4",
+    "express-ws": "^2.0.0-beta",
+    "guid": "0.0.12",
+    "lodash": "^4.11.1"
+  }
+}
