@@ -4,8 +4,10 @@ var expressWs = require('express-ws')(app);
 var Guid = require('guid');
 var _ = require('lodash');
 
-var currentWs = null;
+var connections = {};
 var responses = {};
+
+var ID_REGEX = /(DUMBTUNNEL-\w{10})/;
 
 if (!process.env.TOKEN) {
   console.log('You must supply a TOKEN in the environment.');
@@ -19,16 +21,25 @@ app.ws('/_connect', function(ws, req) {
     return;
   }
 
-  if (currentWs) {
-    console.log('closing old ws');
-    currentWs.terminate();
+  var id = req.query.id;
+  if (!id || !id.match(ID_REGEX)) {
+    console.log('Closing ws connection with invalid id', id);
+    ws.terminate();
+    return;
   }
 
-  console.log('backend connected');
+  if (connections[id]) {
+    console.log(id, 'closing old ws');
+    connections[id].terminate();
+    delete connections[id];
+  }
+
+  connections[id] = ws;
+  console.log(id, 'backend connected for ');
 
   ws.on('message', function(message, flags) {
     if (!message) {
-      console.log('ignoring empty message');
+      console.log(id, 'ignoring empty message');
       return;
     }
 
@@ -41,7 +52,7 @@ app.ws('/_connect', function(ws, req) {
       return;
     }
 
-    console.log('got response from backend', response.id, response.statusCode);
+    console.log(id, 'got response from backend', response.id, response.statusCode);
 
     var res = responses[response.id];
     if (res) {
@@ -55,21 +66,28 @@ app.ws('/_connect', function(ws, req) {
   });
 
   ws.on('error', function(err) {
-    console.log('ws error', err);
+    console.log(id, 'ws error', err);
   });
 
   ws.on('close', function() {
-    console.log('backend disconnected');
-    if (currentWs === ws) {
-      currentWs = null;
+    console.log(id, 'backend disconnected');
+    if (connections[id] === ws) {
+      delete connections[id];
     }
   });
-
-  currentWs = ws;
 });
 
 app.all('*', function(req, res) {
   console.log('got request', req.originalUrl);
+
+  var match = req.url.match(ID_REGEX);
+  if (!match) {
+    console.log('no id found', req.url);
+    res.status(500).send('no id found\n');
+    return;
+  }
+
+  var id = match[1];
 
   var body = [];
   req.on('data', function(chunk) {
@@ -77,7 +95,9 @@ app.all('*', function(req, res) {
   });
 
   req.on('end', function() {
-    if (currentWs) {
+    var ws = connections[id];
+
+    if (ws) {
       var reqId = Guid.raw();
       var serializedReq = JSON.stringify({
         id: reqId,
@@ -89,10 +109,10 @@ app.all('*', function(req, res) {
 
       responses[reqId] = res;
 
-      currentWs.send(serializedReq)
-      console.log('send request to backend with id', reqId);
+      ws.send(serializedReq)
+      console.log(id, 'send request to backend with id', reqId);
     } else {
-      console.log('no backend');
+      console.log(id, 'no backend');
       res.status(500).send('no backend\n');
     }
   });

@@ -5,13 +5,14 @@ var url = require('url');
 var frontendUrl = process.env.FRONTEND_URL; // wss://example.com
 var serverUrl = process.env.SERVICE_URL;   // http://localhost:5000
 var token = process.env.TOKEN;
+var id = process.env.ID;
 
 var parsedServerUrl = url.parse(serverUrl);
 
 function reconnect() {
   console.log('connecting to frontend');
 
-  var ws = new WebSocket(frontendUrl + '/_connect', {
+  var ws = new WebSocket(frontendUrl + `/_connect?id=${id}`, {
     headers: {
       authorization: `Token ${token}`
     }
